@@ -26,6 +26,7 @@ FLAGGED_TILE = pygame.image.load("FlaggedTile.png")
 QUESTION_TILE = pygame.image.load("QuestionTile.png")
 SMILEY = pygame.image.load("Smiley.png")
 DEAD_SMILEY = pygame.image.load("Dead.png")
+COOL_SMILEY = pygame.image.load("Glasses.png")
 CLICKED_TILE = []
 for i in range(9):
     CLICKED_TILE.append(pygame.image.load("ClickedTile%d.png" % i))
@@ -33,19 +34,22 @@ for i in range(9):
 #Define what the program does if the user left clicks on a tile.
 def left_click(coordinate):
     global state
-    if(coordinate[1] < 0 and (X_TILES/2-1) < coordinate[0] < (X_TILES/2+1)):
+    global lost_game
+    if(coordinate[1] < 0 and math.floor(X_TILES/2-2) < coordinate[0] < math.floor(X_TILES/2+1)):
         reinit()
-    
-    elif(state[coordinate[0]][coordinate[1]][0] is 0 and coordinate[1] > 0):
-        if(check_if_mine(coordinate)):
-            lost_the_game()
-        else:
-            uncover_tile(coordinate)
-            state[coordinate[0]][coordinate[1]][0] = 1
-            if(state[coordinate[0]][coordinate[1]][1] is 0):
-                propogate(coordinate)
-    elif(state[coordinate[0]][coordinate[1]][0] is 1 and coordinate[1] > 0):
-        destroy_adjacent(coordinate)
+    elif(not lost_game and not won_game):
+        if(state[coordinate[0]][coordinate[1]][0] is 0 and coordinate[1] >= 0):
+            if(check_if_mine(coordinate)):
+                lost_game = True
+                end_the_game()
+            else:
+                uncover_tile(coordinate)
+                state[coordinate[0]][coordinate[1]][0] = 1
+                did_you_win()
+                if(state[coordinate[0]][coordinate[1]][1] is 0):
+                    propagate(coordinate)
+        elif(state[coordinate[0]][coordinate[1]][0] is 1 and coordinate[1] >= 0):
+            destroy_adjacent(coordinate)
         
 #Define what the program does if the use right clicks on a tile.
 def right_click(coordinate):
@@ -68,7 +72,7 @@ def uncover_tile(coordinate):
     if(check_if_mine(coordinate)):
         GAME_SURFACE.blit(BOMB_TILE, get_pixel(coordinate))
         return True
-    else:
+    else:   
         GAME_SURFACE.blit(CLICKED_TILE[state[coordinate[0]][coordinate[1]][1]], get_pixel(coordinate))
         return False
         
@@ -91,6 +95,17 @@ def check_if_mine(coordinate):
     else:
         return False
 
+def did_you_win():
+    global won_game
+    for x in range(X_TILES):
+        for y in range(Y_TILES):
+            if(state[x][y][0] is 0 and state[x][y][1] is not 10):
+                print("u didnt wen")
+                return
+    won_game = True
+    print("u one")
+    end_the_game()
+        
 #Check all of the neighbors around the tile you left clicked on and count the mines.        
 def check_neighbors(coordinate):
     mine_counter=0
@@ -99,7 +114,7 @@ def check_neighbors(coordinate):
             if(check_if_mine((coordinate[0] + dx,coordinate[1] + dy))):
                 mine_counter += 1
     return mine_counter     
-
+    
 def check_neighbors_flags(coordinate):
     flag_counter=0
     for dx, dy in [(i,j) for i in (-1,0,1) for j in (-1,0,1) if not (i is j is 0)]: #iterate through adjacent cells
@@ -108,8 +123,8 @@ def check_neighbors_flags(coordinate):
                 flag_counter += 1
     return flag_counter     
 
-#Propogates through a big empty pocket for the player
-def propogate(coordinate):
+#propagates through a big empty pocket for the player
+def propagate(coordinate):
     global state
     for dx, dy in [(i,j) for i in (-1,0,1) for j in (-1,0,1) if not (i is j is 0)]: #iterate through adjacent cells
         if(0 <= (coordinate[0] + dx) < X_TILES and 0 <= (coordinate[1] + dy) < Y_TILES): #check boundaries
@@ -143,14 +158,16 @@ def populate_state():
                     state[x][y][1] = check_neighbors((x, y))
 
 #Uncover all bombs and lock the screen up if the game is lost                    
-def lost_the_game():
-    global LOST_GAME
-    LOST_GAME = True
-    GAME_SURFACE.blit(DEAD_SMILEY, ((X_TILES*TILE_SIZE)/2 - SMILEY_SIZE/2, 0))
-    for x in range(X_TILES):
-        for y in range(Y_TILES):
-            if(check_if_mine((x,y)) and state[x][y][0] is 0):
-                uncover_tile((x, y))
+def end_the_game():
+    if(lost_game):
+        GAME_SURFACE.blit(DEAD_SMILEY, ((X_TILES*TILE_SIZE)/2 - SMILEY_SIZE/2, 0))
+        for x in range(X_TILES):
+            for y in range(Y_TILES):
+                if(check_if_mine((x,y)) and state[x][y][0] is 0):
+                    uncover_tile((x, y))
+    elif(won_game):
+        GAME_SURFACE.blit(COOL_SMILEY, ((X_TILES*TILE_SIZE)/2 - SMILEY_SIZE/2, 0))
+        
                 
 #Below are the initializations and main loop
 
@@ -161,7 +178,8 @@ FPSCLOCK = pygame.time.Clock()
 
 #Initialize the board with blank tiles
 def reinit():
-    global LOST_GAME
+    global lost_game
+    global won_game
     global remaining_mines
     global state
     for x in range(X_TILES):
@@ -169,7 +187,8 @@ def reinit():
             GAME_SURFACE.blit(NORMAL_TILE, (x*TILE_SIZE, y*TILE_SIZE + SMILEY_SIZE))
             state[x][y][0] = 0
             state[x][y][1] = 0
-    LOST_GAME = False
+    lost_game = False
+    won_game = False
     generate_mines(MINES)
     populate_state()   
     GAME_SURFACE.blit(SMILEY, ((X_TILES*TILE_SIZE)/2 - SMILEY_SIZE/2, 0))

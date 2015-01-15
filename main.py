@@ -181,7 +181,7 @@ def get_time():
     elif(time_dif < 1000):
         return str(time_dif)
     else:
-        lost_game = true
+        lost_game = True
         end_the_game()
         
 #Refresh the mine_counter and timer text boxes.

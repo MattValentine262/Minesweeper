@@ -25,6 +25,7 @@ BOMB_TILE = pygame.image.load("RedBombTile.png")
 FLAGGED_TILE = pygame.image.load("FlaggedTile.png")
 QUESTION_TILE = pygame.image.load("QuestionTile.png")
 SMILEY = pygame.image.load("Smiley.png")
+DEAD_SMILEY = pygame.image.load("Dead.png")
 CLICKED_TILE = []
 for i in range(9):
     CLICKED_TILE.append(pygame.image.load("ClickedTile%d.png" % i))
@@ -32,13 +33,19 @@ for i in range(9):
 #Define what the program does if the user left clicks on a tile.
 def left_click(coordinate):
     global state
-    if(state[coordinate[0]][coordinate[1]][0] is 0):
+    if(coordinate[1] < 0 and (X_TILES/2-1) < coordinate[0] < (X_TILES/2+1)):
+        reinit()
+    
+    elif(state[coordinate[0]][coordinate[1]][0] is 0 and coordinate[1] > 0):
         if(check_if_mine(coordinate)):
             lost_the_game()
         else:
             uncover_tile(coordinate)
             state[coordinate[0]][coordinate[1]][0] = 1
-
+            if(state[coordinate[0]][coordinate[1]][1] is 0):
+                propogate(coordinate)
+    elif(state[coordinate[0]][coordinate[1]][0] is 1 and coordinate[1] > 0):
+        destroy_adjacent(coordinate)
         
 #Define what the program does if the use right clicks on a tile.
 def right_click(coordinate):
@@ -79,7 +86,7 @@ def get_pixel(coordinate):
     
 #Check to see if the tile you clicked on contains a mine.    
 def check_if_mine(coordinate):
-    if(state[coordinate[0]][coordinate[1]][1] == 10):
+    if(state[coordinate[0]][coordinate[1]][1] is 10):
         return True
     else:
         return False
@@ -87,11 +94,34 @@ def check_if_mine(coordinate):
 #Check all of the neighbors around the tile you left clicked on and count the mines.        
 def check_neighbors(coordinate):
     mine_counter=0
-    for dx, dy in [(i,j) for i in (-1,0,1) for j in (-1,0,1) if not (i == j == 0)]: #iterate through adjacent cells
-        if(0 <= (coordinate[0]+dx) < X_TILES and 0 <= (coordinate[1]+dy) < Y_TILES): #check boundaries
-            if(check_if_mine((coordinate[0]+dx,coordinate[1]+dy))):
+    for dx, dy in [(i,j) for i in (-1,0,1) for j in (-1,0,1) if not (i is j is 0)]: #iterate through adjacent cells
+        if(0 <= (coordinate[0] + dx) < X_TILES and 0 <= (coordinate[1] + dy) < Y_TILES): #check boundaries
+            if(check_if_mine((coordinate[0] + dx,coordinate[1] + dy))):
                 mine_counter += 1
-    return mine_counter        
+    return mine_counter     
+
+def check_neighbors_flags(coordinate):
+    flag_counter=0
+    for dx, dy in [(i,j) for i in (-1,0,1) for j in (-1,0,1) if not (i is j is 0)]: #iterate through adjacent cells
+        if(0 <= (coordinate[0] + dx) < X_TILES and 0 <= (coordinate[1] + dy) < Y_TILES): #check boundaries
+            if(state[coordinate[0] + dx][coordinate[1] + dy][0] is 2):
+                flag_counter += 1
+    return flag_counter     
+
+#Propogates through a big empty pocket for the player
+def propogate(coordinate):
+    global state
+    for dx, dy in [(i,j) for i in (-1,0,1) for j in (-1,0,1) if not (i is j is 0)]: #iterate through adjacent cells
+        if(0 <= (coordinate[0] + dx) < X_TILES and 0 <= (coordinate[1] + dy) < Y_TILES): #check boundaries
+            if(state[coordinate[0] + dx][coordinate[1] + dy][0] is 0):
+                left_click((coordinate[0] + dx,coordinate[1] + dy))
+
+def destroy_adjacent(coordinate):
+    if(check_neighbors_flags(coordinate) is state[coordinate[0]][coordinate[1]][1]):
+        for dx, dy in [(i,j) for i in (-1,0,1) for j in (-1,0,1) if not (i is j is 0)]: #iterate through adjacent cells
+            if(0 <= (coordinate[0] + dx) < X_TILES and 0 <= (coordinate[1] + dy) < Y_TILES): #check boundaries
+                if(state[coordinate[0] + dx][coordinate[1] + dy][0] is 0):
+                    left_click((coordinate[0] + dx,coordinate[1] + dy))
         
 #Randomly generate the mines.
 def generate_mines(mine_quantity):
@@ -102,10 +132,7 @@ def generate_mines(mine_quantity):
         y = random.randint(0,Y_TILES-1)
         if(state[x][y][1] is 0):
             state[x][y][1] = 10
-            print("(", x, ",", y, ")")
             i += 1
-        else:
-            pass
     
 #populate the 3d list that contains data about the board.    
 def populate_state():
@@ -119,14 +146,15 @@ def populate_state():
 def lost_the_game():
     global LOST_GAME
     LOST_GAME = True
+    GAME_SURFACE.blit(DEAD_SMILEY, ((X_TILES*TILE_SIZE)/2 - SMILEY_SIZE/2, 0))
     for x in range(X_TILES):
         for y in range(Y_TILES):
-            if(check_if_mine((x,y))):
+            if(check_if_mine((x,y)) and state[x][y][0] is 0):
                 uncover_tile((x, y))
                 
 #Below are the initializations and main loop
-generate_mines(MINES)
-populate_state()
+
+remaining_mines = MINES
 pygame.init()
 pygame.display.set_caption('Minesweeper')
 FPSCLOCK = pygame.time.Clock()
@@ -134,13 +162,16 @@ FPSCLOCK = pygame.time.Clock()
 #Initialize the board with blank tiles
 def reinit():
     global LOST_GAME
-    LOST_GAME = False
+    global remaining_mines
+    global state
     for x in range(X_TILES):
         for y in range(Y_TILES):
             GAME_SURFACE.blit(NORMAL_TILE, (x*TILE_SIZE, y*TILE_SIZE + SMILEY_SIZE))
-    '''for x in range(X_TILES):
-        for y in range(Y_TILES):
-            uncover_tile((x, y))'''      
+            state[x][y][0] = 0
+            state[x][y][1] = 0
+    LOST_GAME = False
+    generate_mines(MINES)
+    populate_state()   
     GAME_SURFACE.blit(SMILEY, ((X_TILES*TILE_SIZE)/2 - SMILEY_SIZE/2, 0))
     remaining_mines = MINES
 
@@ -148,7 +179,7 @@ def reinit():
 reinit()
 while True:
     for event in pygame.event.get():
-        if event.type == QUIT:
+        if event.type is QUIT:
             pygame.quit()
             sys.exit()
         elif event.type is  MOUSEBUTTONDOWN and event.button is LEFT:

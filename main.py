@@ -79,8 +79,9 @@ def uncover_tile(coordinate):
         
 #Find the tile that corresponds to the pixel coordinates of a mouse click.        
 def get_tile(coordinate):
-    box = (math.floor(coordinate[0]/TILE_SIZE), 
-            math.floor((coordinate[1]-SMILEY_SIZE)/TILE_SIZE))
+    box = (int(math.floor(coordinate[0]/TILE_SIZE)), 
+            int(math.floor((coordinate[1]-SMILEY_SIZE)/TILE_SIZE)))
+
     return box
 
 #Figure out the upper left pixel of a specific tile for drawing purposes.    
